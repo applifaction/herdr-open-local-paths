@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Added manifest regression coverage so the sized path picker cannot use an unsupported non-popup placement or lower its required Herdr runtime contract.
+
 ## [0.4.0] - 2026-07-18
 
 ### Added

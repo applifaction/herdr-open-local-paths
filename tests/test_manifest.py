@@ -17,8 +17,18 @@ class ManifestTests(unittest.TestCase):
                 text = manifest.read_text(encoding="utf-8")
                 self.assertIn('id = "yigitkg.local-path-actions"', text)
                 self.assertIn('version = "0.4.0"', text)
-                self.assertRegex(text, r'min_herdr_version = "\d+\.\d+\.\d+"')
+                self.assertIn('min_herdr_version = "0.7.4"', text)
                 self.assertIn(f'platforms = ["{platform}"]', text)
+
+    def test_sized_picker_uses_popup_placement(self):
+        for platform, manifest in MANIFESTS.items():
+            with self.subTest(platform=platform):
+                text = manifest.read_text(encoding="utf-8")
+                pane = text.split("[[panes]]", maxsplit=1)[1]
+                self.assertIn('id = "path-picker"', pane)
+                self.assertIn('placement = "popup"', pane)
+                self.assertIn('width = "75%"', pane)
+                self.assertIn('height = "55%"', pane)
 
     def test_action_ids_are_unique_and_referenced_scripts_exist(self):
         action_sets = []
