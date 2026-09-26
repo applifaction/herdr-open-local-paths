@@ -6,3 +6,11 @@ __pycache__/
 node_modules/
 dist/
 *.log
+
+# Machine-local notes, diagnostics and agent runtime data are not publishable.
+/.local-validation/
+/.pi-subagents/
+/LOCAL-INSTALL.md
+.env
+.env.*
+!.env.example

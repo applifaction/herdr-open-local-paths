@@ -1,50 +1,94 @@
+<div align="center">
+
 # Herdr Local Path Actions
 
-[![CI](https://github.com/yigitkg/herdr-open-local-paths/actions/workflows/ci.yml/badge.svg)](https://github.com/yigitkg/herdr-open-local-paths/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+**Open the files your terminal talks about.**
 
-Open files and folders mentioned in recent Herdr pane output without copying paths into File Explorer by hand.
+[![Herdr 0.7.4+](https://img.shields.io/badge/Herdr-0.7.4%2B-blue)](https://herdr.dev)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
+[![MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
-![Local Path Picker](docs/path-picker.svg)
+[Quick start](#quick-start) · [Usage](#usage) · [LibreOffice focus](#libreoffice-focus-on-linuxx11) · [Troubleshooting](#troubleshooting)
 
-The plugin scans the focused pane's last 120 lines. One existing path is handled immediately; several paths open a small picker. Files are shown before folders and repeated paths are listed once.
+</div>
 
-## Requirements
+A [Herdr](https://herdr.dev) plugin for opening, revealing, and copying local files from terminal output. Ctrl-click a file link, or choose from a compact picker—without copying a path into another application.
 
-- Herdr 0.7.4 or newer
-- Windows, Linux, or WSL2
-- Python 3.10 or newer available as `python` on Windows or `python3` on Linux/WSL
-- `xdg-open` on desktop Linux, or `explorer.exe` on Windows/WSL
+This is an independently maintained fork of [yigitkg/herdr-open-local-paths](https://github.com/yigitkg/herdr-open-local-paths). It adds file-URI and symlink safety fixes plus document-aware LibreOffice window activation. It uses Herdr's plugin API; no Herdr, terminal, or coding-agent patches are required.
 
-macOS is not currently declared supported because its end-to-end workflow has not been verified.
+![Local path picker showing generated files](docs/path-picker.svg)
 
-## Install
+## Features
 
-Linux and WSL:
+- **Ctrl-click file links:** open explicit `file://` hyperlinks with the default application.
+- **Pick recent files:** scan recent pane output; handle one existing path directly or show a picker when several are found.
+- **Open, reveal, or copy:** files appear before folders, with repeated paths deduplicated.
+- **Recognize common formats:** absolute and relative paths, file URIs, quoted paths, Markdown destinations, and source references such as `src/main.py:42`.
+- **Bring the right document forward:** optional Linux/X11 support identifies an open LibreOffice document by its full URI, not just its filename.
+- **Keep guards in place:** argument arrays instead of shell interpolation, executable-file checks, and remote-pane precautions. See [the security model](SECURITY.md).
+
+## Quick start
+
+### Requirements
+
+| Environment | Requirements |
+| --- | --- |
+| Linux | Herdr **0.7.4+**, Python **3.10+** as `python3`, and `xdg-open` |
+| WSL | Herdr **0.7.4+**, Python **3.10+** as `python3`, and Windows Explorer interop |
+| Native Windows | Herdr **0.7.4+**, Python **3.10+** as `python` |
+
+Core path actions use the Python standard library. The optional LibreOffice focus adapter has [additional desktop dependencies](#libreoffice-focus-on-linuxx11). macOS is not declared supported.
+
+### Link a checkout
+
+From the root of this repository on Linux or WSL:
 
 ```bash
-herdr plugin install yigitkg/herdr-open-local-paths
-```
-
-Native Windows (PowerShell):
-
-```powershell
-herdr plugin install yigitkg/herdr-open-local-paths/windows
-```
-
-For development from this checkout:
-
-```bash
-herdr plugin link /absolute/path/to/herdr-open-local-paths
+herdr plugin link "$PWD"
+herdr plugin action list --plugin yigitkg.local-path-actions
 ```
 
 On native Windows, link the Windows manifest:
 
 ```powershell
-herdr plugin link "C:\path\to\herdr-open-local-paths\windows\herdr-plugin.toml"
+herdr plugin link (Resolve-Path .\windows\herdr-plugin.toml).Path
 ```
 
-Add the shortcuts to your Herdr configuration:
+> [!IMPORTANT]
+> This fork retains the plugin ID `yigitkg.local-path-actions` for shortcut compatibility. Use either the upstream plugin or this fork, not both. Unlink a previous local checkout or uninstall a previous managed installation before switching sources.
+
+### Install from GitHub
+
+Once this fork is published at `applifaction/herdr-open-local-paths`:
+
+```bash
+# Linux / WSL
+herdr plugin install applifaction/herdr-open-local-paths --ref master
+
+# Native Windows
+herdr plugin install applifaction/herdr-open-local-paths/windows --ref master
+```
+
+For reproducible installations, replace `master` with a reviewed commit or release tag. No build step is required. Herdr registers plugins for the current user across sessions.
+
+## Usage
+
+### Ctrl-click a file link
+
+Use an absolute, URI-encoded destination in output from an application that renders terminal hyperlinks:
+
+```markdown
+[Open report](file:///home/me/reports/quarterly%20report.csv)
+```
+
+In pi, ask the agent to emit an absolute `file:///…` link. Then **Ctrl-click** its label in Herdr.
+
+> [!NOTE]
+> A plain filesystem path or relative Markdown destination is not automatically a clickable file link. Use `file://` for clicks, or the recent-path picker for plain paths. A missing file is not created or downloaded.
+
+### Add picker shortcuts
+
+Add these optional bindings to your Herdr configuration, then reload it:
 
 ```toml
 [[keys.command]]
@@ -57,79 +101,95 @@ description = "open a recent local path"
 key = "prefix+shift+o"
 type = "plugin_action"
 command = "yigitkg.local-path-actions.reveal-latest-path"
-description = "show a recent local path in its folder"
+description = "show a recent path in its folder"
 ```
 
-Reload the Herdr configuration after editing it.
+```bash
+herdr server reload-config
+```
 
-## Use
+These actions inspect the focused pane's last **120 lines** by default. In the picker, use **↑/↓** or **j/k**, then **Enter**. **Esc** or **q** cancels. The initiating shortcut determines whether Enter opens, reveals, or copies the selection.
 
-- `prefix+alt+o` opens the selected file with its default application. For a folder, it opens the folder.
-- `prefix+shift+o` shows the selected file in File Explorer or the desktop file manager.
-- In the picker, use `↑`/`↓` or `j`/`k`, then press `Enter`. `Esc` or `q` closes it.
+Additional actions include `copy-latest-path`, `open-path`, `reveal-path`, and `copy-resolved-path`. The non-`latest` actions use Herdr's selected text or clicked URL. List available actions with `herdr plugin action list --plugin yigitkg.local-path-actions`.
 
-The popup does not use `o`, `r`, or `c`. The shortcut used to launch it determines what `Enter` does.
-
-Recognized forms include:
+For scanned paths containing spaces, use quotes, backticks, or a Markdown destination:
 
 ```text
-/home/me/project/report.pdf
 ./output/report.csv
-C:\Users\me\Desktop\chart.png
-file:///home/me/project/index.html
 `/home/me/My Reports/final report.xlsx`
 [report](</home/me/My Reports/final report.xlsx>)
-src/main.py:42:7
+C:\Users\me\Desktop\chart.png
 ```
 
-Paths containing spaces should be quoted, backticked, or used as a Markdown link destination. A candidate must exist locally when scanned.
+## LibreOffice focus on Linux/X11
 
-## Safety
+An open request can succeed while an existing Calc window stays behind the terminal. This fork adds a bounded, optional activation step:
 
-- Commands are passed as argument arrays; path text is not evaluated by a shell.
-- Executable and high-risk file types such as `.exe`, `.cmd`, `.sh`, and `.desktop` are refused by the open action. Reveal the file instead.
-- UNC/network paths are not probed because filesystem checks can block.
-- SSH, Mosh, `docker`/`podman exec`, and `kubectl exec` panes are detected through Herdr process information. Open/reveal is refused in detected remote panes to avoid opening a same-named local file.
-- If pane locality cannot be verified, relative paths fail closed. `LOCAL_PATH_ACTIONS_ALLOW_REMOTE=1` is an expert override and should only be used when you know the pane and path are local.
-- Temporary picker data is private to the user, size- and count-bounded, single-use, and pruned after one hour.
+1. Confirm that LibreOffice is the default application for the file type.
+2. Read the full document URI from LibreOffice's AT-SPI accessibility metadata.
+3. Require an exact canonical-path match and an unambiguous frame/window mapping.
+4. Activate that window through X11.
 
-Process-based remote detection cannot identify every nested remote tool. Do not open paths whose ownership you do not trust.
+It does **not** guess from a filename or choose the first matching window. Missing information, duplicate matches, or unavailable dependencies leave normal file opening unchanged.
+
+The adapter requires `xdotool`, Python GI with Gio and AT-SPI introspection, and normally `/usr/bin/python3`. It does not run on Wayland, WSL, or Windows. See [setup, verification, and limitations](docs/libreoffice-focus.md).
+
+## Safety and configuration
+
+> [!WARNING]
+> Terminal output is untrusted input. The plugin runs with your user permissions and is not a sandbox or malware scanner. Only open files you trust. Document contents and application behavior are outside its guarantees.
+
+The open action refuses high-risk extensions, POSIX executables—including through file URIs—and risky POSIX symlink targets. Recognized SSH, Mosh, and container-exec panes are refused for open/reveal. Unknown pane locality blocks relative paths; remote detection cannot identify every nested setup.
+
+Optional environment settings must be available to the plugin process:
+
+| Variable | Purpose |
+| --- | --- |
+| `LOCAL_PATH_ACTIONS_SCAN_LINES` | Recent-output scan length; default `120`, bounded to `20–500` |
+| `LOCAL_PATH_ACTIONS_DRY_RUN=1` | Report platform open/reveal commands without launching them; not a general no-side-effects mode for every action |
+
+Expert overrides are documented in [SECURITY.md](SECURITY.md). Keep them disabled for normal use. Store machine-local configuration outside the source checkout.
 
 ## Troubleshooting
 
-No files appear:
-
-- Confirm the path exists locally and appeared within the last 120 pane lines.
-- Quote or backtick paths containing spaces.
-- Use `prefix+alt+o` or `prefix+shift+o` from the pane containing the output.
-
-The action fails:
-
-- Confirm `python --version` on Windows or `python3 --version` on Linux/WSL reports 3.10 or newer.
-- Confirm Herdr is 0.7.4 or newer.
-- In WSL, confirm `explorer.exe .` opens File Explorer.
-- A risky file must be revealed rather than opened.
-- A relative path is refused when pane locality cannot be established.
-
-Inspect recent plugin logs:
+| Symptom | Check |
+| --- | --- |
+| Ctrl-click does nothing | Confirm an enabled `file://` handler, an actual terminal hyperlink, and an existing local destination. |
+| Picker has no files | Ensure the path appeared recently and exists locally. Quote paths containing spaces. |
+| File opens behind the terminal | Check the optional focus adapter's [dependencies and scope](docs/libreoffice-focus.md). |
+| Open is refused | Check executable permissions, file type, symlink target, and pane locality. Reveal the file instead of disabling safeguards. |
+| Clipboard action fails | Install a platform clipboard helper; the plugin also prints the resolved path. |
 
 ```bash
+herdr plugin list --plugin yigitkg.local-path-actions --json
 herdr plugin log list --plugin yigitkg.local-path-actions --limit 10
 ```
 
-## Development
+Diagnostic actions `diagnose` and `diagnose-latest-path` report resolution details. Their output can contain local paths or selected text; review it before sharing.
 
-The plugin has no third-party Python dependencies.
+## Development
 
 ```bash
 python3 -m unittest discover -s tests -v
-python3 -m py_compile src/local_path_actions.py src/path_picker.py
+python3 -m py_compile src/local_path_actions.py src/libreoffice_focus.py src/path_picker.py
 ```
 
-On Windows, use `python` in place of `python3`.
+Use `python` on Windows. CI runs on pushes to `master` and on pull requests, with Linux and Windows jobs. Linux-only CLI tests replace desktop and accessibility boundaries with fakes; the automated suite does not launch GUI applications.
 
-See [SECURITY.md](SECURITY.md) for vulnerability reporting and [CHANGELOG.md](CHANGELOG.md) for release history.
+| Module | Responsibility |
+| --- | --- |
+| `src/local_path_actions.py` | Herdr context, path resolution, guards, and platform commands |
+| `src/path_picker.py` | Interactive picker and private snapshot handling |
+| `src/libreoffice_focus.py` | Optional exact-document Linux/X11 activation |
 
-## License
+## Disable or remove
 
-[MIT](LICENSE)
+```bash
+herdr plugin disable yigitkg.local-path-actions
+
+# Unregister a linked checkout:
+herdr plugin unlink yigitkg.local-path-actions
+
+# Or remove a GitHub-managed installation:
+herdr plugin uninstall yigitkg.local-path-actions
+```

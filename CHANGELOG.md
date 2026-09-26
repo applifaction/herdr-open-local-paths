@@ -4,9 +4,22 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Optional Linux/X11 LibreOffice foreground activation, using the full document URI from AT-SPI and an unambiguous frame/window mapping.
+- Black-box CLI regression tests for file-link safety and desktop activation without launching real GUI applications.
+
 ### Fixed
 
+- POSIX executable-file checks also apply to local `file://` links.
+- POSIX symlink targets cannot bypass the risky-extension check through an innocuous link name.
 - Added manifest regression coverage so the sized path picker cannot use an unsupported non-popup placement or lower its required Herdr runtime contract.
+
+### Changed
+
+- Public-facing setup, usage, safety and troubleshooting documentation for this fork.
+- CI runs on `master` and compiles the optional activation helper.
+- Machine-local installation notes, diagnostic artifacts and agent runtime data are excluded from version control.
 
 ## [0.4.0] - 2026-07-18
 
@@ -45,6 +58,6 @@ All notable changes to this project are documented here.
 - Network path checks, subprocess calls, clipboard calls, and picker snapshots are bounded.
 - Decoded file URLs and terminal control sequences are validated before use.
 
-[Unreleased]: https://github.com/yigitkg/herdr-open-local-paths/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/applifaction/herdr-open-local-paths/compare/ce94304...master
 [0.4.0]: https://github.com/yigitkg/herdr-open-local-paths/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/yigitkg/herdr-open-local-paths/releases/tag/v0.3.0
