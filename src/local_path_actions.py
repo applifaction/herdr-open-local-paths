@@ -874,11 +874,20 @@ def reveal_path(resolved: ResolvedPath) -> None:
 def ensure_open_allowed(resolved: ResolvedPath) -> None:
     ensure_windows_path_is_canonical(resolved.local_path)
     ensure_path_exists_for_action(resolved)
-    suffix = suffix_for_path(resolved.local_path)
-    if suffix in HIGH_RISK_EXTENSIONS and os.environ.get("LOCAL_PATH_ACTIONS_ALLOW_RISKY") != "1":
-        raise LocalPathError(
-            f"{suffix} files can run code. Reveal it instead, or set LOCAL_PATH_ACTIONS_ALLOW_RISKY=1."
-        )
+    checked_paths = [resolved.local_path]
+    if resolved.host_platform != "windows" and not is_windows_path(resolved.local_path):
+        path = Path(resolved.local_path)
+        if path.is_symlink():
+            try:
+                checked_paths.append(str(path.resolve(strict=True)))
+            except (OSError, RuntimeError) as exc:
+                raise LocalPathError("Could not safely resolve the symlink target.") from exc
+    for checked_path in checked_paths:
+        suffix = suffix_for_path(checked_path)
+        if suffix in HIGH_RISK_EXTENSIONS and os.environ.get("LOCAL_PATH_ACTIONS_ALLOW_RISKY") != "1":
+            raise LocalPathError(
+                f"{suffix} files can run code. Reveal it instead, or set LOCAL_PATH_ACTIONS_ALLOW_RISKY=1."
+            )
     if is_posix_executable(resolved) and os.environ.get("LOCAL_PATH_ACTIONS_ALLOW_RISKY") != "1":
         raise LocalPathError(
             "Executable files can run code. Reveal it instead, or set "
@@ -903,6 +912,7 @@ def is_posix_executable(resolved: ResolvedPath) -> bool:
         "posix",
         "home",
         "relative",
+        "file-url",
         "wsl-unc",
     }:
         return False
