@@ -863,6 +863,30 @@ def open_path(resolved: ResolvedPath) -> None:
     ensure_open_allowed(resolved)
     command = open_command(resolved.local_path, resolved.host_platform)
     run_platform_command(command)
+    if activate_existing_desktop_window(resolved):
+        print("local-path-actions: Activated the matching document window.", file=sys.stderr)
+
+
+def activate_existing_desktop_window(resolved: ResolvedPath) -> bool:
+    """Optional native-X11 adapter; never infer document identity from a title."""
+    if (resolved.host_platform != "linux" or not resolved.is_file
+            or os.environ.get("LOCAL_PATH_ACTIONS_DRY_RUN") == "1"
+            or not os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")
+            or os.environ.get("XDG_SESSION_TYPE") == "wayland" or is_wsl_environment()
+            or not shutil.which("xdotool")):
+        return False
+    try:
+        # Desktop GI bindings are distro packages, not generally present in the
+        # virtualenv that may run Herdr's plugin command.
+        desktop_python = "/usr/bin/python3" if Path("/usr/bin/python3").is_file() else sys.executable
+        result = subprocess.run(
+            [desktop_python, str(Path(__file__).with_name("libreoffice_focus.py")), resolved.local_path],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=4,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
 
 
 def reveal_path(resolved: ResolvedPath) -> None:
