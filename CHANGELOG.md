@@ -6,11 +6,15 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- Ctrl-click support for relative terminal hyperlinks in both manifests, resolved against the pane cwd (workspace cwd fallback) with existing locality and executable-file guards.
+- Relative-link CLI regression coverage for the reported Markdown report and three PNG links, cwd selection, URI decoding and rejected unsafe targets.
 - Optional Linux/X11 LibreOffice foreground activation, using the full document URI from AT-SPI and an unambiguous frame/window mapping.
 - Black-box CLI regression tests for file-link safety and desktop activation without launching real GUI applications.
 
 ### Fixed
 
+- Clicked relative URLs decode percent-encoded filenames once and ignore URL query/fragment components without stripping literal filename punctuation.
+- Relative path resolution refuses non-absolute cwd metadata instead of using the plugin process directory.
 - POSIX executable-file checks also apply to local `file://` links.
 - POSIX symlink targets cannot bypass the risky-extension check through an innocuous link name.
 - Added manifest regression coverage so the sized path picker cannot use an unsupported non-popup placement or lower its required Herdr runtime contract.

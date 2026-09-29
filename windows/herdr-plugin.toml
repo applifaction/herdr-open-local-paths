@@ -67,6 +67,14 @@ title = "Open file URL"
 pattern = "^file://.+$"
 action = "open-path"
 
+# Scheme-less terminal hyperlinks only; never claim HTTP(S), other schemes,
+# protocol-relative network URLs, or same-document anchors.
+[[link_handlers]]
+id = "relative-path"
+title = "Open relative path link"
+pattern = '^[^/\\:?#\x00-\x1f\x7f]+(?:/[^\x00-\x1f\x7f]+|\.[A-Za-z0-9]{1,12}(?:[?#][^\x00-\x1f\x7f]*)?)$'
+action = "open-path"
+
 [[panes]]
 id = "path-picker"
 title = "Local Path Picker"

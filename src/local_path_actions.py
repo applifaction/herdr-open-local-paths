@@ -15,7 +15,7 @@ import uuid
 from dataclasses import dataclass, asdict
 from pathlib import Path, PureWindowsPath
 from typing import Any
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote, urlparse, urlsplit
 
 
 HIGH_RISK_EXTENSIONS = {
@@ -629,12 +629,17 @@ def clean_candidate_from_scan(candidate: str) -> str:
 def resolve_candidate(text: str, source: str, context: PluginContext) -> ResolvedPath:
     if "\x00" in text:
         raise LocalPathError("Path contains a NUL byte and was rejected.")
-    cleaned = strip_ansi(text).strip()
-    cleaned = unwrap_candidate(cleaned)
-    if is_windows_path(cleaned):
-        ensure_windows_path_is_canonical(cleaned)
-    cleaned = trim_trailing_punctuation(cleaned)
-    path_text, path_kind = path_from_text(cleaned)
+    if source == "clicked_url":
+        # A hyperlink has exact boundaries, unlike text scanned from a terminal.
+        # Do not strip filename punctuation or apply the text-detection heuristic.
+        cleaned = text
+        path_text, path_kind = path_from_clicked_url(text)
+    else:
+        cleaned = unwrap_candidate(strip_ansi(text).strip())
+        if is_windows_path(cleaned):
+            ensure_windows_path_is_canonical(cleaned)
+        cleaned = trim_trailing_punctuation(cleaned)
+        path_text, path_kind = path_from_text(cleaned)
     path_without_line, line, column = split_line_suffix(path_text, path_kind)
     host = host_platform()
     local_path, normalized_kind, warning = normalize_path(path_without_line, path_kind, context, host)
@@ -721,6 +726,27 @@ def path_from_text(text: str) -> tuple[str, str]:
     raise LocalPathError("Selected text does not look like a supported local path.")
 
 
+def path_from_clicked_url(url: str) -> tuple[str, str]:
+    """Decode relative URI paths once, without turning them into another URL kind."""
+    if any(ord(char) < 32 or ord(char) == 127 for char in url):
+        raise LocalPathError("Clicked URL contains control characters and was rejected.")
+    parsed = urlsplit(url)
+    if parsed.scheme or is_windows_path(url) or url.startswith(("/", "~/")):
+        # Existing file-URI and explicit filesystem paths retain their semantics.
+        return path_from_text(url)
+    if parsed.netloc or not parsed.path:
+        raise LocalPathError("Relative link does not contain a local path.")
+    try:
+        path = unquote(parsed.path, errors="strict")
+    except UnicodeDecodeError as exc:
+        raise LocalPathError("Relative link contains invalid UTF-8 encoding.") from exc
+    if any(ord(char) < 32 or ord(char) == 127 for char in path):
+        raise LocalPathError("Decoded relative link contains control characters and was rejected.")
+    if path.startswith(("/", "\\", "~/")) or is_windows_path(path) or urlsplit(path).scheme:
+        raise LocalPathError("Decoded relative link must remain a relative local path.")
+    return path, "relative"
+
+
 def file_url_to_path(url: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme != "file":
@@ -773,8 +799,8 @@ def normalize_path(
         return str(Path(path_text).expanduser()), "home", None
     if path_kind == "relative":
         base = context.focused_pane_cwd or context.workspace_cwd
-        if not base:
-            raise LocalPathError("Relative path needs focused_pane_cwd or workspace_cwd from Herdr.")
+        if not base or not Path(base).is_absolute():
+            raise LocalPathError("Relative path needs an absolute focused_pane_cwd or workspace_cwd from Herdr.")
         resolved = str(Path(base, path_text).resolve(strict=False))
         if is_wsl_environment() and WSL_MOUNT_RE.match(resolved):
             win_path = wsl_mount_to_windows(resolved)

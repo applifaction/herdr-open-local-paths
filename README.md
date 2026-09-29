@@ -20,7 +20,7 @@ This is an independently maintained fork of [yigitkg/herdr-open-local-paths](htt
 
 ## Features
 
-- **Ctrl-click file links:** open explicit `file://` hyperlinks with the default application.
+- **Ctrl-click file links:** open explicit `file://` or relative-path hyperlinks with the default application.
 - **Pick recent files:** scan recent pane output; handle one existing path directly or show a picker when several are found.
 - **Open, reveal, or copy:** files appear before folders, with repeated paths deduplicated.
 - **Recognize common formats:** absolute and relative paths, file URIs, quoted paths, Markdown destinations, and source references such as `src/main.py:42`.
@@ -75,16 +75,29 @@ For reproducible installations, replace `master` with a reviewed commit or relea
 
 ### Ctrl-click a file link
 
-Use an absolute, URI-encoded destination in output from an application that renders terminal hyperlinks:
+Use a destination in output from an application that renders terminal hyperlinks, such as pi:
 
 ```markdown
 [Open report](file:///home/me/reports/quarterly%20report.csv)
+[Project report](reports/quarterly%20report.csv)
+[Preview](./output/preview.png)
+[Readme](README.md)
 ```
 
-In pi, ask the agent to emit an absolute `file:///…` link. Then **Ctrl-click** its label in Herdr.
+**Ctrl-click** the label in Herdr. Relative links use the clicked pane's current working directory, falling back to the workspace directory only when the pane directory is unavailable. They never use the plugin's own directory or search other directories when a file is missing. Herdr must identify the pane as local; unknown or remote panes are refused.
+
+Relative URL paths are percent-decoded once. Query strings and fragments are ignored when opening the local file; encode literal `#` and `?` in filenames as `%23` and `%3F`. HTTP(S), other URL schemes, network URLs and anchor-only links are not claimed by the relative-path handler. Absolute `file:///…` links remain the most reliable choice if the pane's working directory may change.
 
 > [!NOTE]
-> A plain filesystem path or relative Markdown destination is not automatically a clickable file link. Use `file://` for clicks, or the recent-path picker for plain paths. A missing file is not created or downloaded.
+> Clicks require an actual terminal hyperlink (OSC 8), not just path-shaped text. Use the recent-path picker for plain paths. Missing files are not created or downloaded.
+
+After updating an already linked checkout, refresh the registered manifest once:
+
+```bash
+herdr plugin link /path/to/herdr-open-local-paths
+```
+
+No pi or Herdr restart is needed; existing terminal hyperlinks also use the refreshed handler.
 
 ### Add picker shortcuts
 
@@ -154,7 +167,7 @@ Expert overrides are documented in [SECURITY.md](SECURITY.md). Keep them disable
 
 | Symptom | Check |
 | --- | --- |
-| Ctrl-click does nothing | Confirm an enabled `file://` handler, an actual terminal hyperlink, and an existing local destination. |
+| Ctrl-click does nothing | Confirm enabled `file-url` / `relative-path` handlers, an actual terminal hyperlink, and an existing destination. Re-link the checkout after manifest updates. |
 | Picker has no files | Ensure the path appeared recently and exists locally. Quote paths containing spaces. |
 | File opens behind the terminal | Check the optional focus adapter's [dependencies and scope](docs/libreoffice-focus.md). |
 | Open is refused | Check executable permissions, file type, symlink target, and pane locality. Reveal the file instead of disabling safeguards. |
