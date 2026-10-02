@@ -46,7 +46,7 @@ HIGH_RISK_EXTENSIONS = {
     ".wsh",
 }
 
-WINDOWS_DRIVE_RE = re.compile(r"^[a-zA-Z]:[\\/].+")
+WINDOWS_DRIVE_RE = re.compile(r"^[a-zA-Z]:[\\/].*")
 UNC_RE = re.compile(r"^\\\\[^\\/:*?\"<>|\r\n]+\\[^\\/:*?\"<>|\r\n]+")
 WSL_MOUNT_RE = re.compile(r"^/mnt/([a-zA-Z])(?:/|$)")
 LINE_SUFFIX_RE = re.compile(r"^(?P<path>.+?)(?::(?P<line>\d+)(?::(?P<column>\d+))?)$")
@@ -887,26 +887,55 @@ def inspect_path(local_path: str) -> tuple[bool, bool, bool, bool]:
 
 def open_path(resolved: ResolvedPath) -> None:
     ensure_open_allowed(resolved)
+    activation_snapshot = capture_desktop_activation_snapshot(resolved)
     command = open_command(resolved.local_path, resolved.host_platform)
     run_platform_command(command)
-    if activate_existing_desktop_window(resolved):
+    if activate_existing_desktop_window(resolved, activation_snapshot):
         print("local-path-actions: Activated the matching document window.", file=sys.stderr)
 
 
-def activate_existing_desktop_window(resolved: ResolvedPath) -> bool:
-    """Optional native-X11 adapter; never infer document identity from a title."""
-    if (resolved.host_platform != "linux" or not resolved.is_file
-            or os.environ.get("LOCAL_PATH_ACTIONS_DRY_RUN") == "1"
-            or not os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")
-            or os.environ.get("XDG_SESSION_TYPE") == "wayland" or is_wsl_environment()
-            or not shutil.which("xdotool")):
+def desktop_activation_supported(resolved: ResolvedPath) -> bool:
+    return not (
+        resolved.host_platform != "linux" or not resolved.is_file
+        or os.environ.get("LOCAL_PATH_ACTIONS_DRY_RUN") == "1"
+        or not os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")
+        or os.environ.get("XDG_SESSION_TYPE") == "wayland" or is_wsl_environment()
+        or not shutil.which("xdotool")
+    )
+
+
+def desktop_focus_helper_command(*args: str) -> list[str]:
+    # Desktop GI bindings are distro packages, not generally present in the
+    # virtualenv that may run Herdr's plugin command.
+    desktop_python = "/usr/bin/python3" if Path("/usr/bin/python3").is_file() else sys.executable
+    return [desktop_python, str(Path(__file__).with_name("libreoffice_focus.py")), *args]
+
+
+def capture_desktop_activation_snapshot(resolved: ResolvedPath) -> str | None:
+    """Capture matching X11 windows before opening to prevent title-only races."""
+    if not desktop_activation_supported(resolved):
+        return None
+    try:
+        result = subprocess.run(
+            desktop_focus_helper_command("snapshot", resolved.local_path),
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            text=True, timeout=3,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    snapshot = result.stdout.strip()
+    if result.returncode != 0 or not snapshot or len(snapshot) > 4096:
+        return None
+    return snapshot
+
+
+def activate_existing_desktop_window(resolved: ResolvedPath, snapshot: str | None) -> bool:
+    """Activate after URI proof; fallback additionally requires a valid snapshot."""
+    if not desktop_activation_supported(resolved):
         return False
     try:
-        # Desktop GI bindings are distro packages, not generally present in the
-        # virtualenv that may run Herdr's plugin command.
-        desktop_python = "/usr/bin/python3" if Path("/usr/bin/python3").is_file() else sys.executable
         result = subprocess.run(
-            [desktop_python, str(Path(__file__).with_name("libreoffice_focus.py")), resolved.local_path],
+            desktop_focus_helper_command("activate", resolved.local_path, snapshot or ""),
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             timeout=4,
         )

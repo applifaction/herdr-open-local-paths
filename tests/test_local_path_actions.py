@@ -24,6 +24,10 @@ class LocalPathActionsTests(unittest.TestCase):
         self.assertEqual(resolved.local_path, r"C:\Users\me\Downloads\report.xlsx")
         self.assertEqual(resolved.path_kind, "windows-drive")
 
+        root = self.resolve("C:\\")
+        self.assertEqual(root.local_path, "C:\\")
+        self.assertEqual(root.path_kind, "windows-drive")
+
     def test_file_url_windows(self):
         ctx = lpa.PluginContext(clicked_url="file:///C:/Users/me/Desktop/a%20b.xlsx")
         resolved = lpa.resolve_from_context(ctx)

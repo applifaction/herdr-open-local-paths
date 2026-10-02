@@ -40,6 +40,23 @@ class RelativeLinkManifestTests(unittest.TestCase):
                 with self.subTest(manifest=manifest, url=url):
                     self.assertTrue(any(p.fullmatch(url) for p in manifest_patterns(manifest)), url)
 
+    def test_platform_manifests_route_native_absolute_paths(self):
+        cases = (
+            (ROOT / "herdr-plugin.toml", (
+                "/home/ernsto/prj/academix.ch/angebot-technische-umsetzung-academix.docx",
+                "/",
+            )),
+            (ROOT / "windows/herdr-plugin.toml", (
+                r"C:\Users\me\Documents\offer.docx",
+                "C:\\",
+            )),
+        )
+        for manifest, urls in cases:
+            patterns = manifest_patterns(manifest)
+            for url in urls:
+                with self.subTest(manifest=manifest, url=url):
+                    self.assertTrue(any(pattern.fullmatch(url) for pattern in patterns), url)
+
     def test_web_other_schemes_network_and_anchor_only_links_are_not_intercepted(self):
         for manifest in (ROOT / "herdr-plugin.toml", ROOT / "windows/herdr-plugin.toml"):
             for url in ("https://example.org/report.md", "http://localhost:3000/a.png",
@@ -119,6 +136,12 @@ class RelativeLinkCliTests(unittest.TestCase):
         for url in ("./report.md", "../pane/report.md", "report.md"):
             with self.subTest(url=url):
                 self.assert_opened(self.open_link(url), target)
+
+    def test_absolute_posix_paths_are_dispatched_and_opened(self):
+        target = self.document("offer.docx")
+        for url, expected in ((str(target), target), ("/", Path("/"))):
+            with self.subTest(url=url):
+                self.assert_opened(self.open_link(url), expected)
 
     def test_workspace_is_fallback_only_when_pane_cwd_is_missing(self):
         target = self.document("report.md", self.workspace)

@@ -20,11 +20,11 @@ This is an independently maintained fork of [yigitkg/herdr-open-local-paths](htt
 
 ## Features
 
-- **Ctrl-click file links:** open explicit `file://` or relative-path hyperlinks with the default application.
+- **Ctrl-click file links:** open explicit `file://`, native absolute-path, or relative-path hyperlinks with the default application.
 - **Pick recent files:** scan recent pane output; handle one existing path directly or show a picker when several are found.
 - **Open, reveal, or copy:** files appear before folders, with repeated paths deduplicated.
 - **Recognize common formats:** absolute and relative paths, file URIs, quoted paths, Markdown destinations, and source references such as `src/main.py:42`.
-- **Bring the right document forward:** optional Linux/X11 support identifies an open LibreOffice document by its full URI, not just its filename.
+- **Bring the right document forward:** optional Linux/X11 support prefers LibreOffice's full document URI and uses a before/after X11 snapshot plus exact open-file proof when Writer exposes no URI.
 - **Keep guards in place:** argument arrays instead of shell interpolation, executable-file checks, and remote-pane precautions. See [the security model](SECURITY.md).
 
 ## Quick start
@@ -79,12 +79,13 @@ Use a destination in output from an application that renders terminal hyperlinks
 
 ```markdown
 [Open report](file:///home/me/reports/quarterly%20report.csv)
+[Absolute report](/home/me/reports/quarterly-report.csv)
 [Project report](reports/quarterly%20report.csv)
 [Preview](./output/preview.png)
 [Readme](README.md)
 ```
 
-**Ctrl-click** the label in Herdr. Relative links use the clicked pane's current working directory, falling back to the workspace directory only when the pane directory is unavailable. They never use the plugin's own directory or search other directories when a file is missing. Herdr must identify the pane as local; unknown or remote panes are refused.
+**Ctrl-click** the label in Herdr. Native absolute paths are passed through as exact local paths. Relative links use the clicked pane's current working directory, falling back to the workspace directory only when the pane directory is unavailable. They never use the plugin's own directory or search other directories when a file is missing. Recognized remote panes are refused; when pane locality is unknown, only relative paths are refused because their base cannot be trusted.
 
 Relative URL paths are percent-decoded once. Query strings and fragments are ignored when opening the local file; encode literal `#` and `?` in filenames as `%23` and `%3F`. HTTP(S), other URL schemes, network URLs and anchor-only links are not claimed by the relative-path handler. Absolute `file:///…` links remain the most reliable choice if the pane's working directory may change.
 
@@ -139,11 +140,12 @@ C:\Users\me\Desktop\chart.png
 An open request can succeed while an existing Calc window stays behind the terminal. This fork adds a bounded, optional activation step:
 
 1. Confirm that LibreOffice is the default application for the file type.
-2. Read the full document URI from LibreOffice's AT-SPI accessibility metadata.
-3. Require an exact canonical-path match and an unambiguous frame/window mapping.
-4. Activate that window through X11.
+2. Snapshot matching LibreOffice X11 windows before handing the file to `xdg-open`.
+3. Prefer the full document URI from LibreOffice's AT-SPI accessibility metadata.
+4. If a document view exposes no URI, require its LibreOffice process to hold the exact canonical file open and require either a revalidated window remembered from a prior successful activation or a newly matching window absent from the snapshot.
+5. Require an unambiguous frame/window mapping and activate that window through X11.
 
-It does **not** guess from a filename or choose the first matching window. Missing information, duplicate matches, or unavailable dependencies leave normal file opening unchanged.
+A filename alone is never enough, and the plugin never chooses the first matching window. Missing open-file proof, duplicate matches, conflicting URI metadata, stale pre-existing windows, or unavailable dependencies leave normal file opening unchanged.
 
 The adapter requires `xdotool`, Python GI with Gio and AT-SPI introspection, and normally `/usr/bin/python3`. It does not run on Wayland, WSL, or Windows. See [setup, verification, and limitations](docs/libreoffice-focus.md).
 
@@ -167,7 +169,7 @@ Expert overrides are documented in [SECURITY.md](SECURITY.md). Keep them disable
 
 | Symptom | Check |
 | --- | --- |
-| Ctrl-click does nothing | Confirm enabled `file-url` / `relative-path` handlers, an actual terminal hyperlink, and an existing destination. Re-link the checkout after manifest updates. |
+| Ctrl-click does nothing | Confirm enabled `file-url` / `absolute-path` / `relative-path` handlers, an actual terminal hyperlink, and an existing destination. Re-link the checkout after manifest updates. |
 | Picker has no files | Ensure the path appeared recently and exists locally. Quote paths containing spaces. |
 | File opens behind the terminal | Check the optional focus adapter's [dependencies and scope](docs/libreoffice-focus.md). |
 | Open is refused | Check executable permissions, file type, symlink target, and pane locality. Reveal the file instead of disabling safeguards. |

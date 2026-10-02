@@ -67,6 +67,13 @@ title = "Open file URL"
 pattern = "^file://.+$"
 action = "open-path"
 
+# Native absolute filesystem links only; UNC/network paths remain unclaimed.
+[[link_handlers]]
+id = "absolute-path"
+title = "Open absolute local path"
+pattern = '^[A-Za-z]:[\\/][^\x00-\x1f\x7f]*$'
+action = "open-path"
+
 # Scheme-less terminal hyperlinks only; never claim HTTP(S), other schemes,
 # protocol-relative network URLs, or same-document anchors.
 [[link_handlers]]

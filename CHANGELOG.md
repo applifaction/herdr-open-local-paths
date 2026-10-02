@@ -13,6 +13,8 @@ All notable changes to this project are documented here.
 
 ### Fixed
 
+- LibreOffice Writer windows can now be activated on Linux/X11 when AT-SPI exposes no document URI, using a conservative pre-open X11 snapshot, exact open-file proof, newly observed windows and revalidated remembered mappings.
+- Absolute native filesystem hyperlinks such as `/home/me/report.docx` and `C:\Users\me\report.docx` are now routed to the local-path action instead of being ignored by Herdr's link-handler manifest.
 - Clicked relative URLs decode percent-encoded filenames once and ignore URL query/fragment components without stripping literal filename punctuation.
 - Relative path resolution refuses non-absolute cwd metadata instead of using the plugin process directory.
 - POSIX executable-file checks also apply to local `file://` links.

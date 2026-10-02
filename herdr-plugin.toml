@@ -67,6 +67,14 @@ title = "Open file URL"
 pattern = "^file://.+$"
 action = "open-path"
 
+# Absolute POSIX filesystem links only; when present, the second character
+# must not be a slash so protocol-relative network URLs remain unclaimed.
+[[link_handlers]]
+id = "absolute-path"
+title = "Open absolute local path"
+pattern = '^/(?:[^/\x00-\x1f\x7f][^\x00-\x1f\x7f]*)?$'
+action = "open-path"
+
 # Scheme-less terminal hyperlinks only; never claim HTTP(S), other schemes,
 # protocol-relative network URLs, or same-document anchors.
 [[link_handlers]]
